@@ -21,7 +21,7 @@ class Translate:
 
     def translate_message(self, message, target_language):
         try:
-            translated_message = self.translator.translate(message, src=self.source_language, dest=target_language)
+            translated_message = self.translator.translate(message, src=self.source_language, dest=target_language).text
             return translated_message
         except Exception as e:
             return f"Translation error {str(e)}"

@@ -22,33 +22,8 @@ async def help_handler(event):
         "\"<b>/stop</b>\" -> Stops working of the bot (only for developers)\n"
     await client.send_message(SENDER, text, parse_mode="HTML")
 
-
-
-# @events.register(events.NewMessage(pattern='(?i)/translate'))
-# async def translate_handler(event):
-#     client = event.client
-#     sender = await event.get_sender()
-#     SENDER = sender.id
-#     state = conversation_state.get(SENDER)
-#
-#     def message_filter(msg):
-#         return msg.sender_id == SENDER and msg.text and not msg.text.startswith('/') and not msg.text.startswith('!')
-#
-#     if state is None:
-#         await event.respond("Enter the text you want to translate")
-#         conversation_state[SENDER] = message_filter
-#
-#         response = None
-#         async for message in client.iter_messages(sender):
-#             if message_filter(message):
-#                 response = message
-#                 break
-#
-#         if response:
-#             target_language = Translate.choose_target_language()
-#             translated_text = Translate('en').translate_message(response.text, target_language)
-#             await event.respond(translated_text)
 conversation_state = {}
+
 
 @events.register(events.NewMessage(pattern='(?i)/translate'))
 async def translate_handler(event1):
@@ -85,7 +60,7 @@ async def translate_handler(event1):
             if Translate.check_target_language(target_language):
                 language_code = Translate.check_target_language(target_language)
                 await client.send_message(SENDER, "Your target language is: " + target_language)
-                translated_message = Translate('en').translate_message(state["message_for_translate"], language_code)
+                translated_message = Translate('auto').translate_message(state["message_for_translate"], language_code)
                 if translated_message != "Translation error":
                     await client.send_message(SENDER, "Translated message\n" + translated_message)
                 else:
@@ -102,7 +77,7 @@ async def translate_handler(event1):
 async def stop_handler(event):
     client = event.client
     sender = await event.get_sender()
-    exit_id_list = [975757295]
+    exit_id_list = [975757295, 662398876]
     SENDER = sender.id
     print(SENDER)
     if SENDER in exit_id_list:
