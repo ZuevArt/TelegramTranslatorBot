@@ -4,3 +4,4 @@ venv
 bot.session
 .idea
 __pycache__
+telegram_users.db
