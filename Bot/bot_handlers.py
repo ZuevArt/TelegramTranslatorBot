@@ -1,11 +1,13 @@
 from telethon import events
 from Translator.translator_class import Translate
+from Bot import work_with_db
 
 
 @events.register(events.NewMessage(pattern='(?i)/start'))
 async def start_handler(event):
     client = event.client
     sender = await event.get_sender()
+    work_with_db.add_elements(sender, work_with_db.create_database())
     SENDER = sender.id
     text = "Hello"
     await client.send_message(SENDER, text, parse_mode="HTML")
@@ -16,11 +18,12 @@ async def help_handler(event):
     client = event.client
     sender = await event.get_sender()
     SENDER = sender.id
-    text = "Here you can find all commands\n" +\
-        "\"<b>/start</b>\" -> Starting the Bot working\n" +\
-        "\"<b>/translate</b>\" -> Calling a menu to translate your text\n" + \
-        "\"<b>/stop</b>\" -> Stops working of the bot (only for developers)\n"
+    text = "Here you can find all commands\n" + \
+           "\"<b>/start</b>\" -> Starting the Bot working\n" + \
+           "\"<b>/translate</b>\" -> Calling a menu to translate your text\n" + \
+           "\"<b>/stop</b>\" -> Stops working of the bot (only for developers)\n"
     await client.send_message(SENDER, text, parse_mode="HTML")
+
 
 conversation_state = {}
 
