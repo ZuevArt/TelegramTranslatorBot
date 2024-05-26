@@ -1,6 +1,7 @@
 from telethon import events
 from Translator.translator_class import Translate
 from Bot import work_with_db
+import aiofiles
 
 
 @events.register(events.NewMessage(pattern='(?i)/start'))
@@ -33,6 +34,9 @@ async def translate_handler(event1):
     client = event1.client
     sender = await event1.get_sender()
     SENDER = sender.id
+    sender_entity = await client.get_entity(SENDER)
+    sender_name = sender_entity.first_name or "user"
+
     state = conversation_state.get(SENDER)
     if state is None:
         await client.send_message(SENDER, "Please enter your text")
@@ -63,9 +67,20 @@ async def translate_handler(event1):
             if Translate.check_target_language(target_language):
                 language_code = Translate.check_target_language(target_language)
                 await client.send_message(SENDER, "Your target language is: " + target_language)
+
                 translated_message = Translate('auto').translate_message(state["message_for_translate"], language_code)
                 if translated_message != "Translation error":
-                    await client.send_message(SENDER, "Translated message\n" + translated_message)
+                    original_text_label = Translate('auto').translate_message("Your original text:", language_code)
+                    translated_text_label = Translate('auto').translate_message("Your translated text:", language_code)
+
+                    await client.send_message(SENDER, "Translated message:\n" + translated_message)
+
+                    filename = f"translated_message_{sender_name}.txt"
+                    async with aiofiles.open(filename, 'w') as f:
+                        await f.write(
+                            f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
+
+                    await client.send_file(SENDER, filename)
                 else:
                     await client.send_message(SENDER, translated_message)
                 del conversation_state[SENDER]
