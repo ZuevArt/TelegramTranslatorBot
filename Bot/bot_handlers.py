@@ -1,5 +1,8 @@
 from telethon import events
 from Translator.translator_class import Translate
+from Bot import work_with_db
+import aiofiles
+
 
 disable_commands = {}
 conversation_state = {}
@@ -13,6 +16,7 @@ async def start_handler(event):
 
     client = event.client
     sender = await event.get_sender()
+    work_with_db.add_elements(sender, work_with_db.create_database())
     SENDER = sender.id
     text = "Hello"
     await client.send_message(SENDER, text, parse_mode="HTML")
@@ -34,14 +38,19 @@ async def help_handler(event):
     await client.send_message(SENDER, text, parse_mode="HTML")
 
 
+
+
 @events.register(events.NewMessage(pattern='(?i)/translate'))
 async def translate_handler(event1):
     if disable_commands.get(event1.sender_id):
         await event1.reply("This is a command. Please enter your text.")
         return
+
     client = event1.client
     sender = await event1.get_sender()
     SENDER = sender.id
+    sender_entity = await client.get_entity(SENDER)
+    sender_name = sender_entity.first_name or "user"
 
     state = conversation_state.get(SENDER)
     if state is None:
@@ -51,7 +60,6 @@ async def translate_handler(event1):
 
     @client.on(events.NewMessage(from_users=SENDER))
     async def handle_message(event2):
-
         state = conversation_state.get(SENDER)
         if state is None:
             return
@@ -63,7 +71,6 @@ async def translate_handler(event1):
             given_text = event2.raw_text.strip()
             if given_text.lower().startswith("/"):
                 return
-
             await client.send_message(SENDER, "Your text is: " + given_text)
             await client.send_message(SENDER, Translate.create_text_message())
             state["message_for_translate"] = given_text
@@ -76,9 +83,20 @@ async def translate_handler(event1):
             if Translate.check_target_language(target_language):
                 language_code = Translate.check_target_language(target_language)
                 await client.send_message(SENDER, "Your target language is: " + target_language)
+
                 translated_message = Translate('auto').translate_message(state["message_for_translate"], language_code)
                 if translated_message != "Translation error":
-                    await client.send_message(SENDER, "Translated message\n" + translated_message)
+                    original_text_label = Translate('auto').translate_message("Your original text:", language_code)
+                    translated_text_label = Translate('auto').translate_message("Your translated text:", language_code)
+
+                    await client.send_message(SENDER, "Translated message:\n" + translated_message)
+
+                    filename = f"translated_message_{sender_name}.txt"
+                    async with aiofiles.open(filename, 'w') as f:
+                        await f.write(
+                            f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
+
+                    await client.send_file(SENDER, filename)
                 else:
                     await client.send_message(SENDER, translated_message)
                 del conversation_state[SENDER]
