@@ -1,7 +1,13 @@
-from telethon import events
+from telethon import events, TelegramClient
+from pydub import AudioSegment
 from Translator.translator_class import Translate
 from Bot import work_with_db
 import aiofiles
+import speech_recognition as sr
+import os
+from wit import Wit
+
+wit_client = Wit('LPQ77ZJUAPTXNJVZKEVH4BXZQLHNQ7HN')
 
 disable_commands = {}
 conversation_state = {}
@@ -34,6 +40,51 @@ async def help_handler(event):
             "\"<b>/translate</b>\" -> Calling a menu to translate your text\n"
             "\"<b>/stop</b>\" -> Stops working of the bot (only for developers)\n")
     await client.send_message(SENDER, text, parse_mode="HTML")
+
+
+
+async def voice_to_text(event, client: TelegramClient):
+    sender = await event.get_sender()
+    SENDER = sender.id
+
+    voice = event.message.media.document
+    voice_file_path = await client.download_media(voice, file='voice.ogg')
+
+    audio = AudioSegment.from_ogg(voice_file_path)
+    audio = audio.set_channels(1)
+    audio.export('voice.wav', format='wav')
+
+    recognizer = sr.Recognizer()
+    with sr.AudioFile('voice.wav') as source:
+        audio_data = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio_data, language='en-US')
+            await event.reply(f'Распознанный текст: {text}')
+            state = conversation_state.get(SENDER)
+            if state and state["stage"] == "input_text":
+                state["message_for_translate"] = text
+                state["text"] = text
+                state["stage"] = "input_language"
+                await client.send_message(SENDER, Translate.create_text_message())
+        except sr.UnknownValueError:
+            await event.reply('Не удалось распознать голос. Попробуйте еще раз.')
+        except sr.RequestError as e:
+            await event.reply(f'Ошибка сервиса распознавания: {e}')
+
+        os.remove('voice.ogg')
+        os.remove('voice.wav')
+
+
+@events.register(events.NewMessage(pattern='(?i)/voice_translate'))
+async def voice_translate_handler(event):
+    if disable_commands.get(event.sender_id):
+        await event.reply("This is a command. Please enter your text.")
+        return
+    client = event.client
+
+    @client.on(events.NewMessage(func=lambda e: e.voice))
+    async def handle_voice_message(event1):
+        await voice_to_text(event1, client)
 
 
 @events.register(events.NewMessage(pattern='(?i)/translate'))
