@@ -1,4 +1,5 @@
 telethon
 configparser
 googletrans==4.0.0rc1
-aiofiles
+pydub
+wit
