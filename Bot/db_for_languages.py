@@ -2,7 +2,7 @@ import sqlite3
 
 
 def create_usage_database():
-    conn = sqlite3.connect('language_usage.db')
+    conn = sqlite3.connect('language_users.db')
     cursor = conn.cursor()
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usage (
