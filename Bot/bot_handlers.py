@@ -7,7 +7,6 @@ import speech_recognition as sr
 import os
 from wit import Wit
 
-
 wit_client = Wit('LPQ77ZJUAPTXNJVZKEVH4BXZQLHNQ7HN')
 
 disable_commands = {}
@@ -22,7 +21,6 @@ async def start_handler(event):
 
     client = event.client
     sender = await event.get_sender()
-    work_with_db.add_elements(sender, work_with_db.create_database())
     SENDER = sender.id
     text = "Hello"
     await client.send_message(SENDER, text, parse_mode="HTML")
@@ -42,6 +40,7 @@ async def help_handler(event):
             "\"<b>/translate</b>\" -> Calling a menu to translate your text\n"
             "\"<b>/stop</b>\" -> Stops working of the bot (only for developers)\n")
     await client.send_message(SENDER, text, parse_mode="HTML")
+
 
 
 async def voice_to_text(event, client: TelegramClient):
@@ -143,10 +142,12 @@ async def translate_handler(event1):
                     async with aiofiles.open(filename, 'w') as f:
                         await f.write(
                             f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
-
+                        work_with_db.add_elements(sender,target_language, translated_message, work_with_db.create_database())
                     await client.send_file(SENDER, filename)
                 else:
                     await client.send_message(SENDER, translated_message)
+                    work_with_db.add_last_message(SENDER, translated_message, work_with_db.create_database())
+
                 del conversation_state[SENDER]
                 disable_commands[SENDER] = False
             else:
