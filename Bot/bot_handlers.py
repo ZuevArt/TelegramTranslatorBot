@@ -1,6 +1,7 @@
 from telethon import events
 from Translator.translator_class import Translate
 from Bot import work_with_db
+from Bot import db_for_languages
 import aiofiles
 
 disable_commands = {}
@@ -91,12 +92,13 @@ async def translate_handler(event1):
                     async with aiofiles.open(filename, 'w') as f:
                         await f.write(
                             f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
-                        work_with_db.add_elements(sender,target_language, translated_message, work_with_db.create_database())
+                        work_with_db.add_elements(sender, target_language, translated_message,
+                                                  work_with_db.create_database())
+                        db_for_languages.update_language_usage(SENDER, target_language, db_for_languages.create_usage_database())
                     await client.send_file(SENDER, filename)
                 else:
                     await client.send_message(SENDER, translated_message)
                     work_with_db.add_last_message(SENDER, translated_message, work_with_db.create_database())
-
                 del conversation_state[SENDER]
                 disable_commands[SENDER] = False
             else:
