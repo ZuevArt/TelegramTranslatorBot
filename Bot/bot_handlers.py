@@ -6,9 +6,7 @@ from Bot import db_for_languages
 import aiofiles
 import speech_recognition as sr
 import os
-from wit import Wit
 
-wit_client = Wit('LPQ77ZJUAPTXNJVZKEVH4BXZQLHNQ7HN')
 
 disable_commands = {}
 conversation_state = {}
@@ -41,7 +39,6 @@ async def help_handler(event):
             "\"<b>/translate</b>\" -> Calling a menu to translate your text\n"
             "\"<b>/stop</b>\" -> Stops working of the bot (only for developers)\n")
     await client.send_message(SENDER, text, parse_mode="HTML")
-
 
 
 async def voice_to_text(event, client: TelegramClient):
@@ -143,10 +140,13 @@ async def translate_handler(event1):
                     async with aiofiles.open(filename, 'w') as f:
                         await f.write(
                             f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
+
                         work_with_db.add_elements(sender, target_language, translated_message,
                                                   work_with_db.create_database())
                         db_for_languages.update_language_usage(SENDER, target_language, db_for_languages.create_usage_database())
+
                     await client.send_file(SENDER, filename)
+                    os.remove(f'./translated_message_{sender_name}.txt')
                 else:
                     await client.send_message(SENDER, translated_message)
                     work_with_db.add_last_message(SENDER, translated_message, work_with_db.create_database())
