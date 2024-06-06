@@ -23,5 +23,6 @@ if __name__ == '__main__':
     client.add_event_handler(basic_handlers.help_handler)
     client.add_event_handler(basic_handlers.translate_handler)
     client.add_event_handler(basic_handlers.stop_handler)
+    client.add_event_handler(basic_handlers.voice_translate_handler)
 
     client.run_until_disconnected()
