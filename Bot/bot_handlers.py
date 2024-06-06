@@ -73,7 +73,14 @@ async def text_translate_handler(event1):
     async with client.conversation(SENDER) as conv:
         state = conversation_state.get(SENDER)
         while True:
-            text_message = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER))
+            try:
+                text_message = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER), timeout=60)
+            except asyncio.TimeoutError:
+                await client.send_message(SENDER, "Timeout: No response received. Please try again.")
+                disable_commands[SENDER] = False
+                del conversation_state[SENDER]
+                return
+
             given_text = text_message.text
             if not given_text.startswith("/"):
                 break
@@ -81,7 +88,7 @@ async def text_translate_handler(event1):
         text = "Available languages for translation"
         await conv.send_message(text, buttons=key_target, parse_mode='html')
         try:
-            press = await asyncio.wait_for(conv.wait_event(press_event(SENDER)), timeout=60)
+            press = await asyncio.wait_for(conv.wait_event(press_event(SENDER)), timeout=300)
         except asyncio.TimeoutError:
             await client.send_message(SENDER, "Timeout: No response received. Please try again.")
             disable_commands[SENDER] = False
@@ -117,10 +124,17 @@ async def voice_translate_handler(event):
     sender = await event.get_sender()
     SENDER = sender.id
     await client.send_message(SENDER, "Please send me the voice message you want to translate.")
+    disable_commands[SENDER] = True
 
     while True:
         async with client.conversation(SENDER) as conv:
-            response = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER))
+            try:
+                response = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER), timeout=300)
+            except asyncio.TimeoutError:
+                await client.send_message(SENDER, "Timeout: No response received. Please try again.")
+                disable_commands[SENDER] = False
+                del conversation_state[SENDER]
+                return
             if response.media and response.media.document.mime_type == 'audio/ogg':
                 voice_message = await client.download_media(response.media.document, f'downloads/{SENDER}.ogg')
                 print('Received voice message:', voice_message)
@@ -145,6 +159,7 @@ async def voice_translate_handler(event):
 
                 os.remove(f'./downloads/{SENDER}.ogg')
                 os.remove(wav_file_path)
+                disable_commands[SENDER] = False
                 break
             else:
                 await client.send_message(SENDER, "Please send a valid voice message.")
