@@ -1,15 +1,26 @@
-from telethon import events, TelegramClient
-from pydub import AudioSegment
+from telethon import events
+from telethon.tl.custom import Button
 from Translator.translator_class import Translate
+import asyncio
 from Bot import work_with_db
+import Translator.speech_to_text
 from Bot import db_for_languages
-import aiofiles
-import speech_recognition as sr
 import os
 
 
 disable_commands = {}
 conversation_state = {}
+
+key_audio = [[Button.inline("{}".format("english"), "en-GB"), Button.inline("{}".format("russian"), "ru-RU")],
+             [Button.inline("{}".format("german"), "de-DE"), Button.inline("{}".format("french"), "fr-FR")],
+             [Button.inline("{}".format("italian"), "it-IT"), Button.inline("{}".format("spanish"), "es-ES")]]
+
+key_target = [[Button.inline("{}".format("english"), "english"), Button.inline("{}".format("russian"), "russian")],
+              [Button.inline("{}".format("german"), "german"), Button.inline("{}".format("french"), "french")],
+              [Button.inline("{}".format("italian"), "italian"), Button.inline("{}".format("spanish"), "spanish")]]
+
+def press_event(user_id):
+    return events.CallbackQuery(func=lambda e: e.sender_id == user_id)
 
 
 @events.register(events.NewMessage(pattern='(?i)/start'))
@@ -41,52 +52,8 @@ async def help_handler(event):
     await client.send_message(SENDER, text, parse_mode="HTML")
 
 
-async def voice_to_text(event, client: TelegramClient):
-    sender = await event.get_sender()
-    SENDER = sender.id
-
-    voice = event.message.media.document
-    voice_file_path = await client.download_media(voice, file='voice.ogg')
-
-    audio = AudioSegment.from_ogg(voice_file_path)
-    audio = audio.set_channels(1)
-    audio.export('voice.wav', format='wav')
-
-    recognizer = sr.Recognizer()
-    with sr.AudioFile('voice.wav') as source:
-        audio_data = recognizer.record(source)
-        try:
-            text = recognizer.recognize_google(audio_data, language='en-US')
-            await event.reply(f'Распознанный текст: {text}')
-            state = conversation_state.get(SENDER)
-            if state and state["stage"] == "input_text":
-                state["message_for_translate"] = text
-                state["text"] = text
-                state["stage"] = "input_language"
-                await client.send_message(SENDER, Translate.create_text_message())
-        except sr.UnknownValueError:
-            await event.reply('Не удалось распознать голос. Попробуйте еще раз.')
-        except sr.RequestError as e:
-            await event.reply(f'Ошибка сервиса распознавания: {e}')
-
-        os.remove('voice.ogg')
-        os.remove('voice.wav')
-
-
-@events.register(events.NewMessage(pattern='(?i)/voice_translate'))
-async def voice_translate_handler(event):
-    if disable_commands.get(event.sender_id):
-        await event.reply("This is a command. Please enter your text.")
-        return
-    client = event.client
-
-    @client.on(events.NewMessage(func=lambda e: e.voice))
-    async def handle_voice_message(event1):
-        await voice_to_text(event1, client)
-
-
-@events.register(events.NewMessage(pattern='(?i)/translate'))
-async def translate_handler(event1):
+@events.register(events.NewMessage(pattern='(?i)/text_translate'))
+async def text_translate_handler(event1):
     if disable_commands.get(event1.sender_id):
         await event1.reply("This is a command. Please enter your text.")
         return
@@ -103,60 +70,102 @@ async def translate_handler(event1):
         conversation_state[SENDER] = {"stage": "input_text"}
         disable_commands[SENDER] = True
 
-    @client.on(events.NewMessage(from_users=SENDER))
-    async def handle_message(event2):
+    async with client.conversation(SENDER) as conv:
         state = conversation_state.get(SENDER)
-        if state is None:
-            return
-        if state.get("invalid_attempt", False):
-            if event2.raw_text.lower() != state["text"].lower():
-                state.pop("invalid_attempt")
-
-        if state["stage"] == "input_text":
-            given_text = event2.raw_text.strip()
-            if given_text.lower().startswith("/"):
-                return
-            await client.send_message(SENDER, "Your text is: " + given_text)
-            await client.send_message(SENDER, Translate.create_text_message())
-            state["message_for_translate"] = given_text
-            state["text"] = given_text
-            state["stage"] = "input_language"
-        elif state["stage"] == "input_language":
-            target_language = event2.raw_text.lower()
-            if target_language == state["text"]:
-                return
-            if Translate.check_target_language(target_language):
-                language_code = Translate.check_target_language(target_language)
-                await client.send_message(SENDER, "Your target language is: " + target_language)
-
-                translated_message = Translate('auto').translate_message(state["message_for_translate"], language_code)
-                if translated_message != "Translation error":
-                    original_text_label = Translate('auto').translate_message("Your original text:", language_code)
-                    translated_text_label = Translate('auto').translate_message("Your translated text:", language_code)
-
-                    await client.send_message(SENDER, "Translated message:\n" + translated_message)
-
-                    filename = f"translated_message_{sender_name}.txt"
-                    async with aiofiles.open(filename, 'w') as f:
-                        await f.write(
-                            f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
-
-                        work_with_db.add_elements(sender, target_language, translated_message,
-                                                  work_with_db.create_database())
-                        db_for_languages.update_language_usage(SENDER, target_language, db_for_languages.create_usage_database())
-
-                    await client.send_file(SENDER, filename)
-                    os.remove(f'./translated_message_{sender_name}.txt')
-                else:
-                    await client.send_message(SENDER, translated_message)
-                    work_with_db.add_last_message(SENDER, translated_message, work_with_db.create_database())
-                del conversation_state[SENDER]
+        while True:
+            try:
+                text_message = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER), timeout=60)
+            except asyncio.TimeoutError:
+                await client.send_message(SENDER, "Timeout: No response received. Please try again.")
                 disable_commands[SENDER] = False
+                del conversation_state[SENDER]
+                return
+            given_text = text_message.text
+            if not given_text.startswith("/"):
+                break
+        state["message_for_translate"] = given_text
+        text = "Available languages for translation"
+        await conv.send_message(text, buttons=key_target, parse_mode='html')
+        try:
+            press = await asyncio.wait_for(conv.wait_event(press_event(SENDER)), timeout=300)
+        except asyncio.TimeoutError:
+            await client.send_message(SENDER, "Timeout: No response received. Please try again.")
+            disable_commands[SENDER] = False
+            del conversation_state[SENDER]
+            return
+        target_language = str(press.data.decode("utf-8"))
+        translated_message = Translate('auto').translate_message(state["message_for_translate"], target_language)
+        if len(translated_message) < 1000:
+            await client.send_message(SENDER, "Translated message:\n" + translated_message)
+        else:
+            original_text_label = "Your original text: "
+            translated_text_label = "Your translated text: "
+            filename = f"translated_message_{sender_name}.txt"
+            try:
+                with open(filename, 'w', encoding='utf-8') as file:
+                    file.write(
+                        f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
+                await client.send_file(SENDER, filename)
+                work_with_db.add_elements(sender, target_language, translated_message,
+                                          work_with_db.create_database())
+                db_for_languages.update_language_usage(SENDER, target_language, db_for_languages.create_usage_database())
+                    os.remove(f'./translated_message_{sender_name}.txt')
+            except UnicodeEncodeError as e:
+                await client.send_message(SENDER, f"UnicodeEncodeError: {e}")
+            except Exception as e:
+                await client.send_message(SENDER, f"An error occurred: {e}")
+        disable_commands[SENDER] = False
+        del conversation_state[SENDER]
+
+
+@events.register(events.NewMessage(pattern='(?i)/voice_translate'))
+async def voice_translate_handler(event):
+    if disable_commands.get(event.sender_id):
+        await event.reply("This is a command. Please enter your text.")
+        return
+    client = event.client
+    sender = await event.get_sender()
+    SENDER = sender.id
+    await client.send_message(SENDER, "Please send me the voice message you want to translate.")
+    disable_commands[SENDER] = True
+
+    while True:
+        async with client.conversation(SENDER) as conv:
+            try:
+                response = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER), timeout=300)
+            except asyncio.TimeoutError:
+                await client.send_message(SENDER, "Timeout: No response received. Please try again.")
+                disable_commands[SENDER] = False         
+                del conversation_state[SENDER]
+                return
+            if response.media and response.media.document.mime_type == 'audio/ogg':
+                voice_message = await client.download_media(response.media.document, f'downloads/{SENDER}.ogg')
+                print('Received voice message:', voice_message)
+                wav_file_path = f'./downloads/{SENDER}.wav'
+                Translator.speech_to_text.convert_ogg_to_wav(f'downloads/{SENDER}.ogg', wav_file_path)
+
+                text = "Choose language of given audio file (will be removed in next patch)"
+                await conv.send_message(text, buttons=key_audio, parse_mode='html')
+                press = await conv.wait_event(press_event(SENDER))
+                given_language = str(press.data.decode("utf-8"))
+
+                transcription = Translator.speech_to_text.transcribe_audio_file(wav_file_path, given_language)
+                await conv.send_message("Data from file\n" + transcription)
+
+                text = "Available languages for translation"
+                await conv.send_message(text, buttons=key_target, parse_mode='html')
+                press = await conv.wait_event(press_event(SENDER))
+                target_language = str(press.data.decode("utf-8"))
+                translated_message = Translate('auto').translate_message(transcription, target_language)
+
+                await conv.send_message("Translated message:\n" + translated_message)
+
+                os.remove(f'./downloads/{SENDER}.ogg')
+                os.remove(wav_file_path)
+                disable_commands[SENDER] = False
+                break
             else:
-                if not state.get("invalid_attempt", False):
-                    await client.send_message(SENDER, "Invalid language code. Please try again.")
-                    state["invalid_attempt"] = True
-                    state["text"] = target_language
+                await client.send_message(SENDER, "Please send a valid voice message.")
 
 
 @events.register(events.NewMessage(pattern='(?i)/stop'))
