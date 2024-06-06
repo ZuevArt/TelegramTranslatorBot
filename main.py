@@ -1,5 +1,4 @@
 from telethon import TelegramClient
-# from telethon.tl.custom import Button
 import configparser
 
 import Bot.bot_handlers as basic_handlers
