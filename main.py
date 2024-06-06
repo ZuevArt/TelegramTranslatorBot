@@ -10,7 +10,6 @@ config.read(configPath)
 api_id = int(config.get('default', 'api_id'))
 api_hash = config.get('default', 'api_hash')
 BOT_TOKEN = config.get('default', 'BOT_TOKEN')
-wit_client = config.get('default', 'Wit')
 
 bot_session = "bot"
 
