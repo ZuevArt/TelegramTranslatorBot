@@ -14,7 +14,7 @@ def create_database():
     ''')
     return conn
 
-
+# пока не юзаем
 def get_last_translated_message(user_id, conn):
     cursor = conn.cursor()
     cursor.execute('''
@@ -37,7 +37,7 @@ def add_elements(sender, target_language, message, conn):
            UPDATE users SET last_message = ? WHERE id = ?
        ''', (last_translated_message, user_id))
     conn.commit()
-    print(f'user {username}, id {user_id} his(her) {last_translated_message} with {language}')
+    print(f'user: {username}, id: {user_id}, message: {last_translated_message}, language: {language}')
 
 
 def add_last_message(user_id, last_message, conn):
