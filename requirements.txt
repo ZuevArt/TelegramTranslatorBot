@@ -5,6 +5,5 @@ aiofiles
 pydub
 SpeechRecognition==3.8.1
 ffmpeg-python
-os
 asyncio
 sqlite3

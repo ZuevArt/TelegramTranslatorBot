@@ -109,7 +109,7 @@ async def text_translate_handler(event1):
                 work_with_db.add_elements(sender, target_language, translated_message,
                                           work_with_db.create_database())
                 db_for_languages.update_language_usage(SENDER, target_language, db_for_languages.create_usage_database())
-                    os.remove(f'./translated_message_{sender_name}.txt')
+                os.remove(f'./translated_message_{sender_name}.txt')
             except UnicodeEncodeError as e:
                 await client.send_message(SENDER, f"UnicodeEncodeError: {e}")
             except Exception as e:
