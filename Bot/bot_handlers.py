@@ -1,10 +1,11 @@
 from telethon import events
 from telethon.tl.custom import Button
-import os
 from Translator.translator_class import Translate
 import asyncio
 from Bot import work_with_db
 import Translator.speech_to_text
+from Bot import db_for_languages
+import os
 
 
 disable_commands = {}
@@ -30,7 +31,6 @@ async def start_handler(event):
 
     client = event.client
     sender = await event.get_sender()
-    work_with_db.add_elements(sender, work_with_db.create_database())
     SENDER = sender.id
     text = "Hello"
     await client.send_message(SENDER, text, parse_mode="HTML")
@@ -80,7 +80,6 @@ async def text_translate_handler(event1):
                 disable_commands[SENDER] = False
                 del conversation_state[SENDER]
                 return
-
             given_text = text_message.text
             if not given_text.startswith("/"):
                 break
@@ -107,6 +106,10 @@ async def text_translate_handler(event1):
                     file.write(
                         f"{original_text_label} {state['message_for_translate']}\n\n{translated_text_label} {translated_message}")
                 await client.send_file(SENDER, filename)
+                work_with_db.add_elements(sender, target_language, translated_message,
+                                          work_with_db.create_database())
+                db_for_languages.update_language_usage(SENDER, target_language, db_for_languages.create_usage_database())
+                    os.remove(f'./translated_message_{sender_name}.txt')
             except UnicodeEncodeError as e:
                 await client.send_message(SENDER, f"UnicodeEncodeError: {e}")
             except Exception as e:
@@ -132,7 +135,7 @@ async def voice_translate_handler(event):
                 response = await conv.wait_event(events.NewMessage(incoming=True, from_users=SENDER), timeout=300)
             except asyncio.TimeoutError:
                 await client.send_message(SENDER, "Timeout: No response received. Please try again.")
-                disable_commands[SENDER] = False
+                disable_commands[SENDER] = False         
                 del conversation_state[SENDER]
                 return
             if response.media and response.media.document.mime_type == 'audio/ogg':
