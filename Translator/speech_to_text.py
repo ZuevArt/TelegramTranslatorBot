@@ -11,6 +11,7 @@ def convert_ogg_to_wav(oga_file_path, wav_file_path):
     audio.export(wav_file_path, format="wav")
     print(f"Converted {oga_file_path} to {wav_file_path}")
 
+
 def convert_mp3_to_wav(mp3_file_path, wav_file_path):
     if not os.path.exists(mp3_file_path):
         print(f"Error: The file {mp3_file_path} does not exist.")
@@ -18,6 +19,7 @@ def convert_mp3_to_wav(mp3_file_path, wav_file_path):
     audio = AudioSegment.from_mp3(mp3_file_path)
     audio.export(wav_file_path, format="wav")
     print(f"Converted {mp3_file_path} to {wav_file_path}")
+
 
 def transcribe_audio_file(wav_file_path, language):
     if not os.path.exists(wav_file_path):
