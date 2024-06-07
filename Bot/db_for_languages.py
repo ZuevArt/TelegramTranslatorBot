@@ -17,7 +17,6 @@ def create_usage_database():
     ''')
     return conn
 
-
 def update_language_usage(user_id, language, conn):
     cursor = conn.cursor()
     column = {

@@ -10,7 +10,6 @@ config.read(configPath)
 api_id = int(config.get('default', 'api_id'))
 api_hash = config.get('default', 'api_hash')
 BOT_TOKEN = config.get('default', 'BOT_TOKEN')
-wit_client = config.get('default', 'Wit')
 
 bot_session = "bot"
 
@@ -24,5 +23,6 @@ if __name__ == '__main__':
     client.add_event_handler(basic_handlers.text_translate_handler)
     client.add_event_handler(basic_handlers.stop_handler)
     client.add_event_handler(basic_handlers.voice_translate_handler)
+    client.add_event_handler(basic_handlers.profile_handler)
 
     client.run_until_disconnected()

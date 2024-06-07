@@ -6,3 +6,4 @@ bot.session
 __pycache__
 telegram_users.db
 downloads
+language_users.db
